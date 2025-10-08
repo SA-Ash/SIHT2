@@ -1,0 +1,107 @@
+services:
+  mongo:
+    image: mongo:6
+    container_name: quickprint-mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: quickprint-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+  auth-service:
+    build: ./auth-service
+    environment:
+      - PORT=4001
+      - MONGO_URI=mongodb://mongo:27017/quickprint_auth
+      - JWT_ACCESS_SECRET=dev_access
+      - JWT_REFRESH_SECRET=dev_refresh
+      - OTP_TTL_SEC=300
+      - ALLOW_DEV_GOOGLE=true
+      - COLLEGE_DOMAIN=edu
+    ports:
+      - "4001:4001"
+    depends_on:
+      - mongo
+  api-gateway:
+    build: ./api-gateway
+    environment:
+      - PORT=4000
+      - AUTH_SERVICE_URL=http://auth-service:4001
+      - ORDERS_SERVICE_URL=http://order-service:4002
+      - SHOPS_SERVICE_URL=http://shop-service:4003
+      - DISCOVERY_SERVICE_URL=http://discovery-service:4004
+      - ANALYTICS_SERVICE_URL=http://analytics-service:4005
+      - PAYMENTS_SERVICE_URL=http://payment-service:4006
+    ports:
+      - "4000:4000"
+    depends_on:
+      - auth-service
+      - order-service
+      - shop-service
+      - discovery-service
+      - analytics-service
+      - payment-service
+  order-service:
+    build: ./order-service
+    environment:
+      - PORT=4002
+      - MONGO_URI=mongodb://mongo:27017/quickprint_orders
+      - JWT_ACCESS_SECRET=dev_access
+      - AMQP_URL=amqp://rabbitmq:5672
+    ports:
+      - "4002:4002"
+    depends_on:
+      - mongo
+      - rabbitmq
+  shop-service:
+    build: ./shop-service
+    environment:
+      - PORT=4003
+      - MONGO_URI=mongodb://mongo:27017/quickprint_shops
+      - JWT_ACCESS_SECRET=dev_access
+    ports:
+      - "4003:4003"
+    depends_on:
+      - mongo
+  discovery-service:
+    build: ./discovery-service
+    environment:
+      - PORT=4004
+      - MONGO_URI=mongodb://mongo:27017/quickprint_shops
+    ports:
+      - "4004:4004"
+    depends_on:
+      - mongo
+  analytics-service:
+    build: ./analytics-service
+    environment:
+      - PORT=4005
+      - MONGO_URI_USERS=mongodb://mongo:27017/quickprint_auth
+      - MONGO_URI_ORDERS=mongodb://mongo:27017/quickprint_orders
+      - MONGO_URI_SHOPS=mongodb://mongo:27017/quickprint_shops
+      - JWT_ACCESS_SECRET=dev_access
+    ports:
+      - "4005:4005"
+    depends_on:
+      - mongo
+  payment-service:
+    build: ./payment-service
+    environment:
+      - PORT=4006
+      - MONGO_URI=mongodb://mongo:27017/quickprint_payments
+      - JWT_ACCESS_SECRET=dev_access
+      - AMQP_URL=amqp://rabbitmq:5672
+      - UPI_PAYEE_VPA=quickprint@upi
+    ports:
+      - "4006:4006"
+    depends_on:
+      - mongo
+      - rabbitmq
+volumes:
+  mongo_data:
+
+
